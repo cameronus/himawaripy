@@ -17,7 +17,7 @@ import threading
 import time
 
 import appdirs
-from PIL import Image
+from PIL import Image, ImageOps
 from dateutil.tz import tzlocal
 
 from .utils import set_background, get_desktop_environment
@@ -165,7 +165,7 @@ def thread_main(args):
     output_file = path.join(args.output_dir, strftime("himawari-%Y%m%dT%H%M%S.png", requested_time))
     print("Saving to '%s'..." % (output_file,))
     os.makedirs(path.dirname(output_file), exist_ok=True)
-    png.save(output_file, "PNG")
+    ImageOps.expand(png, border=300, fill='black').save(output_file, 'PNG')
 
     if not set_background(output_file):
         sys.exit("Your desktop environment '{}' is not supported!\n".format(get_desktop_environment()))
