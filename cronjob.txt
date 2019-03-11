@@ -1,0 +1,1 @@
+/10 * * * * /usr/local/bin/gtimeout 20s /anaconda3/bin/himawaripy >> /Users/cameron/Library/Caches/himawaripy/log.txt
