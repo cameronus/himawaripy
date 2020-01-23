@@ -15,6 +15,7 @@ import urllib.request
 from glob import iglob, glob
 import threading
 import time
+import subprocess
 
 import appdirs
 from PIL import Image, ImageOps
@@ -24,7 +25,7 @@ from .utils import set_background, get_desktop_environment
 
 
 # Semantic Versioning: Major, Minor, Patch
-HIMAWARIPY_VERSION = (2, 0, 1)
+HIMAWARIPY_VERSION = (2, 1, 0)
 counter = None
 HEIGHT = 550
 WIDTH = 550
@@ -61,8 +62,7 @@ def download_chunk(args):
 
     # If the tile data is 2867 bytes, it is a blank "No Image" tile.
     if tiledata.__sizeof__() == 2867:
-        print('No image available for {}.'.format(strftime("%Y/%m/%d %H:%M:%S", latest)))
-        os._exit(3)
+        sys.exit('No image available for {}.'.format(strftime("%Y/%m/%d %H:%M:%S", latest)))
 
     with counter.get_lock():
         counter.value += 1
@@ -95,6 +95,8 @@ def parse_args():
     parser.add_argument("--output-dir", type=str, dest="output_dir",
                         help="directory to save the temporary background image",
                         default=appdirs.user_cache_dir(appname="himawaripy", appauthor=False))
+    parser.add_argument("--dont-change", action="store_true", dest="dont_change", default=False,
+                        help="don't change the wallpaper (just download it)")
 
     args = parser.parse_args()
 
@@ -108,16 +110,19 @@ def parse_args():
 
 
 def is_discharging():
-    if not sys.platform.startswith("linux"):  # I hope this will not end up like Windows 95/98 checks one day...
-        sys.exit("Battery saving feature works only on linux!\n")
+    if sys.platform.startswith("linux"):
+        if len(glob("/sys/class/power_supply/BAT*")) > 1:
+            print("Multiple batteries detected, using BAT0.")
 
-    if len(glob("/sys/class/power_supply/BAT*")) > 1:
-        print("Multiple batteries detected, using BAT0.")
+        with open("/sys/class/power_supply/BAT0/status") as f:
+            status = f.readline().strip()
 
-    with open("/sys/class/power_supply/BAT0/status") as f:
-        status = f.readline().strip()
+            return status == "Discharging"
+    elif sys.platform == 'darwin':
+        return b'discharging' in subprocess.check_output(["pmset", "-g", "batt"])
 
-        return status == "Discharging"
+    else:
+        sys.exit("Battery saving feature works only on linux or mac!\n")
 
 
 def download(url):
@@ -172,8 +177,12 @@ def thread_main(args):
     os.makedirs(path.dirname(output_file), exist_ok=True)
     ImageOps.expand(png, border=300, fill='black').save(output_file, 'PNG')
 
-    if not set_background(output_file):
-        sys.exit("Your desktop environment '{}' is not supported!\n".format(get_desktop_environment()))
+    if not args.dont_change:
+        r = set_background(output_file)
+        if not r:
+            sys.exit("Your desktop environment '{}' is not supported!\n".format(get_desktop_environment()))
+    else:
+        print("Not changing your wallpaper as requested.")
 
 
 def main():
